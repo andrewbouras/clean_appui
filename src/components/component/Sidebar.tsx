@@ -2,245 +2,126 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import Image from 'next/image';
-import { toast } from 'react-toastify';
-import ShareNoteModal from '@/components/component/ShareNoteModal';
-import { usePathname } from 'next/navigation';
+import { useRouter } from 'next/router';
+import axios from 'axios';
 import { useAuth } from '@/contexts/AuthContext';
 
 interface Chapter {
   _id: string;
   title: string;
-  notebookId: string;
+  order: number;
 }
 
 interface Notebook {
   _id: string;
   title: string;
+  description: string;
   chapters: Chapter[];
 }
 
-interface EnrolledQuestionBank {
-  _id: string;
-  bankTitle: string;
-  bankUrl: string;
-  isEditor: boolean;
-  isCreator: boolean;
-}
-
-interface SidebarProps {
-  isSidebarOpen: boolean;
-  toggleSidebar: () => void;
-}
-
-const Sidebar: React.FC<SidebarProps> = ({ isSidebarOpen, toggleSidebar }) => {
+export default function Sidebar() {
   const [notebooks, setNotebooks] = useState<Notebook[]>([]);
-  const [enrolledQuestionBanks, setEnrolledQuestionBanks] = useState<EnrolledQuestionBank[]>([]);
-  const [iconSize, setIconSize] = useState(25);
-  const { user, isAuthenticated } = useAuth();
-  const [plan, setPlan] = useState<'free' | 'premium'>('free');
-
-  const pathname = usePathname();
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [expandedNotebooks, setExpandedNotebooks] = useState<Set<string>>(new Set());
+  
+  const router = useRouter();
+  const { user } = useAuth();
 
   useEffect(() => {
-    const fetchNotebooksAndChapters = async () => {
-      const apiUrl = process.env.NODE_ENV === 'production'
-        ? process.env.NEXT_PUBLIC_API_URL_PRODUCTION
-        : process.env.NEXT_PUBLIC_API_URL_DEV ;
-
-      const token = user?.accessToken;
-
-      if (!token) {
-        console.error("No access token found");
-        return;
-      }
-      try {
-        const response = await fetch(`${apiUrl}/notebooks`, { headers: { Authorization: `Bearer ${token}` } });
-        if (!response.ok) throw new Error('Failed to fetch notebooks and chapters');
-        const result: Notebook[] = await response.json();
-        setNotebooks(result || []);
-      } catch (error) {
-        console.error('Error fetching notebooks and chapters:', (error as Error).message);
-        setNotebooks([]);
-      }
-    };
-
-    const fetchEnrolledQuestionBanks = async () => {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL_DEV || 'http://localhost:4000/api';
-      const token = user?.accessToken;
-
-      if (!token) {
-        console.error("No access token found");
-        return;
-      }
-      try {
-        const response = await fetch(`${apiUrl}/user/question-banks`, { headers: { Authorization: `Bearer ${token}` } });
-        if (!response.ok) throw new Error('Failed to fetch enrolled question banks');
-        const result: EnrolledQuestionBank[] = await response.json();
-        setEnrolledQuestionBanks(result || []);
-      } catch (error) {
-        console.error('Error fetching enrolled question banks:', (error as Error).message);
-        setEnrolledQuestionBanks([]);
-      }
-    };
-
-    if (isAuthenticated) {
-      fetchEnrolledQuestionBanks();
-      fetchNotebooksAndChapters();
+    if (user) {
+      fetchNotebooks();
     }
-  }, [isAuthenticated, user]);
+  }, [user]);
 
-  useEffect(() => {
-    const fetchUserPlan = async () => {
-      const apiUrl = process.env.NODE_ENV === 'production'
-        ? process.env.NEXT_PUBLIC_API_URL_PRODUCTION
-        : process.env.NEXT_PUBLIC_API_URL_DEV ;   
-        
-      const token = user?.accessToken;
-  
-      if (!token) {
-        console.error("No access token found");
-        return;
-      }
-      try {
-        const response = await fetch(`${apiUrl}/user/plan`, { headers: { Authorization: `Bearer ${token}` } });
-        if (!response.ok) throw new Error('Failed to fetch user plan');
-        const data = await response.json();
-        setPlan(data.plan);
-      } catch (error) {
-        console.error('Error fetching user plan:', (error as Error).message);
-        setPlan('free');
-      }
-    };
-  
-    if (isAuthenticated) {
-      fetchUserPlan();
+  const fetchNotebooks = async () => {
+    try {
+      const response = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/api/notebooks`, {
+        withCredentials: true
+      });
+      setNotebooks(response.data);
+    } catch (err) {
+      setError('Failed to fetch notebooks');
+    } finally {
+      setLoading(false);
     }
-  }, [isAuthenticated, user]);
-  
+  };
 
-  useEffect(() => {
-    const handleResize = () => {
-      const newSize = window.innerHeight < 500 ? 20 : 25;
-      setIconSize(newSize);
-    };
+  const toggleNotebook = (notebookId: string) => {
+    setExpandedNotebooks(prev => {
+      const next = new Set(prev);
+      if (next.has(notebookId)) {
+        next.delete(notebookId);
+      } else {
+        next.add(notebookId);
+      }
+      return next;
+    });
+  };
 
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, []);
+  if (loading) {
+    return (
+      <div className="w-64 h-screen bg-gray-100 p-4">
+        <div className="animate-pulse">
+          <div className="h-4 bg-gray-300 rounded w-3/4 mb-4"></div>
+          <div className="h-4 bg-gray-300 rounded w-1/2 mb-4"></div>
+          <div className="h-4 bg-gray-300 rounded w-2/3 mb-4"></div>
+        </div>
+      </div>
+    );
+  }
 
-  const sidebarWidth = isSidebarOpen ? 'w-1/6' : 'w-0';
-  const buttonPosition = isSidebarOpen ? 'left-[17%]' : 'left-0';
+  if (error) {
+    return (
+      <div className="w-64 h-screen bg-gray-100 p-4">
+        <div className="text-red-500">{error}</div>
+      </div>
+    );
+  }
 
   return (
-    <>
-      <div className={`fixed h-full bg-gray-200 transition-all duration-500 ${sidebarWidth} overflow-hidden z-10`}>
-        {isSidebarOpen && (
-          <div className="flex items-center justify-between p-5 group">
-            <h1 className="text-xl font-bold truncate">Luminous</h1>
-            <Link href="/smart" className="opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-              <Image src="https://www.svgrepo.com/show/313873/edit.svg" alt="Create New Note" width={20} height={20} />
-            </Link>
-          </div>
-        )}
-        {isSidebarOpen && (
-          <div className="absolute top-5 right-5">
-            <button className="bg-gray-100 text-gray-900 px-3 py-1 rounded-lg">
-              {plan === 'premium' ? 'Premium User' : 'Free User'}
-            </button>
-          </div>
-        )}
-
-        {isSidebarOpen && (
-          <div className="overflow-y-auto p-5 h-[80vh]">
-            {enrolledQuestionBanks.length > 0 && (
-              <div className="mb-4">
-                <h2 className="text-lg font-semibold mb-2">Question Banks</h2>
-                {enrolledQuestionBanks.map(bank => (
-                  <div 
-                    key={bank._id} 
-                    className={`group flex items-center justify-between px-4 py-2 rounded my-1 cursor-pointer ${
-                      pathname === `/bank/${bank.bankUrl}` ? 'bg-blue-600 text-white' : 'hover:bg-blue-200'
-                    }`}
-                  >
-                    <Link href={`/bank/${bank.bankUrl}`} className="flex-grow truncate pl-4">
-                      {bank.bankTitle}
-                    </Link>
-                    {(bank.isEditor || bank.isCreator) && (
-                      <Link 
-                        href={`/bank/${bank.bankUrl}/editor`} 
-                        className="opacity-0 group-hover:opacity-100 transition-opacity duration-300 ml-2"
-                      >
-                        <Image src="/pencil.svg" alt="Edit" width={20} height={20} />
-                      </Link>
-                    )}
-                  </div>
-                ))}
-              </div>
-            )}
-            {notebooks.length > 0 && (
-              <div className="mb-4">
-                <h2 className="text-lg font-semibold mb-2">Classes</h2>
-                {notebooks.map(notebook => (
-                  <div key={notebook._id}>
-                    <Link href={`/notebook/${notebook._id}`}>
-                      <div className={`group flex items-center justify-between px-4 py-2 rounded my-1 cursor-pointer ${
-                        pathname === `/notebook/${notebook._id}` ? 'bg-blue-600 text-white' : 'hover:bg-gray-300'
-                      }`}>
-                        <span className="flex-grow truncate pl-4">{notebook.title}</span>
-                        <div className={`flex items-center opacity-0 group-hover:opacity-100 transition-opacity duration-200 ${
-                          pathname === `/notebook/${notebook._id}` ? 'text-white' : ''
-                        }`}>
-                          <button 
-                            className="mx-1 cursor-pointer hover:opacity-80 transition-opacity"
-                            onClick={(e) => {
-                              e.preventDefault();
-                              // Your share handler
-                            }}
-                          >
-                            <Image src="/share.svg" alt="Share" width={20} height={20} />
-                          </button>
-                          <button 
-                            className="mx-1 cursor-pointer hover:opacity-80 transition-opacity"
-                            onClick={(e) => {
-                              e.preventDefault();
-                              // Your menu handler
-                            }}
-                          >
-                            <Image src="/dots.svg" alt="Menu" width={20} height={20} />
-                          </button>
-                          <Image src="/chevron.svg" alt="Open" width={20} height={20} className="mx-1" />
-                        </div>
-                      </div>
-                    </Link>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
-        {isSidebarOpen && (
-          <div className="absolute bottom-5 w-full px-5">
-            <Link href="/new-notebook">
-              <button className="w-full bg-blue-500 text-white p-2 rounded-lg hover:bg-blue-600">
-                Create New Class
-              </button>
-            </Link>
-          </div>
-        )}
-      </div>
-      <div className={`fixed ${buttonPosition} top-1/2 transform -translate-y-1/2 z-20 bg-transparent w-[4%]`}>
-        <button onClick={toggleSidebar} className="bg-transparent p-2 rounded-l focus:outline-none h-full flex items-center justify-center">
-          <Image
-            src={isSidebarOpen ? 'https://www.svgrepo.com/show/425979/left-arrow.svg' : 'https://www.svgrepo.com/show/425982/right-arrow.svg'}
-            alt="Toggle"
-            width={iconSize}
-            height={iconSize}
-          />
+    <div className="w-64 h-screen bg-gray-100 p-4 overflow-y-auto">
+      <div className="mb-6">
+        <h2 className="text-lg font-semibold mb-4">Your Notebooks</h2>
+        <button
+          onClick={() => router.push('/notebooks/new')}
+          className="w-full bg-blue-500 text-white py-2 px-4 rounded hover:bg-blue-600 transition-colors"
+        >
+          New Notebook
         </button>
       </div>
-    </>
+      
+      <div className="space-y-2">
+        {notebooks.map(notebook => (
+          <div key={notebook._id} className="border rounded bg-white">
+            <button
+              onClick={() => toggleNotebook(notebook._id)}
+              className="w-full text-left p-3 hover:bg-gray-50 transition-colors flex items-center justify-between"
+            >
+              <span className="font-medium">{notebook.title}</span>
+              <span className="text-gray-500">
+                {expandedNotebooks.has(notebook._id) ? '▼' : '▶'}
+              </span>
+            </button>
+            
+            {expandedNotebooks.has(notebook._id) && notebook.chapters.length > 0 && (
+              <div className="pl-4 pb-2">
+                {notebook.chapters
+                  .sort((a, b) => a.order - b.order)
+                  .map(chapter => (
+                    <Link
+                      key={chapter._id}
+                      href={`/notebooks/${notebook._id}/chapters/${chapter._id}`}
+                      className="block py-1 px-3 text-sm text-gray-600 hover:text-blue-500 hover:bg-gray-50 rounded transition-colors"
+                    >
+                      {chapter.title}
+                    </Link>
+                  ))}
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
   );
-};
-
-export default Sidebar;
+}

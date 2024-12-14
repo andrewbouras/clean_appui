@@ -1,79 +1,130 @@
+require('dotenv').config();
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
+const cookieParser = require('cookie-parser');
 const session = require('express-session');
 const passport = require('passport');
-const cookieParser = require('cookie-parser');
-const http = require('http');
-require('dotenv').config();
-
-// Import passport config
-require('./config/passport');
+const GoogleStrategy = require('passport-google-oauth20').Strategy;
+const jwt = require('jsonwebtoken');
+const User = require('./models/User');
+const notebookRoutes = require('./routes/notebookRoutes');
 
 const app = express();
-const server = http.createServer(app);
 
-// Security middleware
-app.use(express.json({ limit: '700mb' }));
-app.use(express.urlencoded({ limit: '700mb', extended: true }));
-app.use(cookieParser(process.env.COOKIE_KEY));
+// Connect to MongoDB
+mongoose.connect(process.env.MONGODB_URI)
+.then(() => console.log('Connected to MongoDB'))
+.catch(err => console.error('MongoDB connection error:', err));
 
-// CORS configuration
+// Middleware
 app.use(cors({
-  origin: ['http://localhost:3000', 'https://notesfront-ha2ry34daa-uc.a.run.app'],
-  methods: ['GET', 'POST', 'PUT', 'DELETE'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
+  origin: process.env.CORS_ORIGIN,
   credentials: true
 }));
-
-// Session configuration
+app.use(express.json());
+app.use(cookieParser());
 app.use(session({
   secret: process.env.SESSION_SECRET,
   resave: false,
   saveUninitialized: false,
-  cookie: { 
+  cookie: {
     secure: process.env.NODE_ENV === 'production',
     httpOnly: true,
-    sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
     maxAge: 24 * 60 * 60 * 1000 // 24 hours
   }
 }));
 
-// Initialize Passport and restore authentication state from session
+// Passport configuration
 app.use(passport.initialize());
 app.use(passport.session());
 
-// Prevent caching
-app.use((req, res, next) => {
-  res.setHeader('Cache-Control', 'no-store');
-  next();
+passport.use(new GoogleStrategy({
+  clientID: process.env.GOOGLE_CLIENT_ID,
+  clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+  callbackURL: process.env.GOOGLE_CALLBACK_URL
+}, async (accessToken, refreshToken, profile, done) => {
+  try {
+    let user = await User.findOne({ googleId: profile.id });
+    
+    if (!user) {
+      user = await User.create({
+        googleId: profile.id,
+        email: profile.emails[0].value,
+        name: profile.displayName,
+        avatar: profile.photos[0].value
+      });
+    }
+    
+    return done(null, user);
+  } catch (error) {
+    return done(error, null);
+  }
+}));
+
+passport.serializeUser((user, done) => {
+  done(null, user.id);
 });
 
-// Database connection
-mongoose.connect(process.env.MONGODB_URI)
-  .then(() => console.log('MongoDB connection established'))
-  .catch(err => {
-    console.error('MongoDB connection error:', err.message, err.stack);
-    process.exit(1);
-  });
+passport.deserializeUser(async (id, done) => {
+  try {
+    const user = await User.findById(id);
+    done(null, user);
+  } catch (error) {
+    done(error, null);
+  }
+});
 
-// Mount routes - only auth routes for now
-app.use('/auth', require('./routes/authRoutes'));
+// Auth routes
+app.get('/auth/google',
+  passport.authenticate('google', { scope: ['profile', 'email'] })
+);
 
-// Global error handler
+app.get('/auth/google/callback',
+  passport.authenticate('google', { failureRedirect: '/login' }),
+  (req, res) => {
+    const token = jwt.sign(
+      { userId: req.user._id },
+      process.env.JWT_SECRET,
+      { expiresIn: '24h' }
+    );
+    
+    res.cookie('token', token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      maxAge: 24 * 60 * 60 * 1000 // 24 hours
+    });
+    
+    res.redirect(process.env.FRONTEND_URL);
+  }
+);
+
+app.get('/auth/logout', (req, res) => {
+  req.logout();
+  res.clearCookie('token');
+  res.json({ message: 'Logged out successfully' });
+});
+
+app.get('/auth/user', (req, res) => {
+  if (!req.user) {
+    return res.status(401).json({ error: 'Not authenticated' });
+  }
+  res.json(req.user);
+});
+
+// API routes
+app.use('/api/notebooks', notebookRoutes);
+
+// Error handling middleware
 app.use((err, req, res, next) => {
   console.error(err.stack);
-  res.status(500).json({ 
-    error: 'Internal Server Error',
-    message: process.env.NODE_ENV === 'development' ? err.message : undefined
-  });
+  res.status(500).json({ error: 'Something went wrong!' });
 });
 
 const PORT = process.env.PORT || 3001;
-server.listen(PORT, () => console.log(`Server is running on port ${PORT}`));
-server.timeout = 300000; // 5 minutes
-
-module.exports = { app };
+app.listen(PORT, () => {
+  console.log(`Server is running on port ${PORT}`);
+});
 
 
 

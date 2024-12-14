@@ -1,64 +1,47 @@
 const mongoose = require('mongoose');
 
-const AddressSchema = new mongoose.Schema({
-  line1: { type: String, required: true },
-  line2: { type: String, required: false },
-  city: { type: String, required: true },
-  state: { type: String, required: true },
-  postal_code: { type: String, required: true },
-  country: { type: String, required: true, default: 'US' }, // Assuming 'US' as default
-});
-
-const UserSchema = new mongoose.Schema({
-  image: {
-    type: String,
-    required: false,
-  },
-  name: {
+const userSchema = new mongoose.Schema({
+  googleId: {
     type: String,
     required: true,
+    unique: true
   },
   email: {
     type: String,
     required: true,
     unique: true,
+    trim: true,
+    lowercase: true
   },
-  googleId: {
+  name: {
     type: String,
-    required: false,
-    unique: true,
-    sparse: true,
+    required: true,
+    trim: true
   },
-  plan: {
+  avatar: {
     type: String,
-    enum: ['free', 'premium'],
-    default: 'free',
+    trim: true
   },
-  subscriptionEndDate: {
+  role: {
+    type: String,
+    enum: ['user', 'admin'],
+    default: 'user'
+  },
+  createdAt: {
     type: Date,
-    required: false,
+    default: Date.now
   },
-  questionsGeneratedThisMonth: {
-    type: Number,
-    default: 0,
-  },
-  stripeCustomerId: {
-    type: String,
-    required: false,
-  },
-  phoneNumber: {
-    type: String,
-    required: false,
-  },
-  address: AddressSchema,  // Embed the address schema here
-  cardBrand: {
-    type: String,
-    required: false,
-  },
-  cardLast4: {
-    type: String,
-    required: false,
-  },
-}, { collection: 'users' });
+  updatedAt: {
+    type: Date,
+    default: Date.now
+  }
+}, {
+  timestamps: true
+});
 
-module.exports = mongoose.model('User', UserSchema);
+// Add indexes for faster queries
+userSchema.index({ googleId: 1 });
+userSchema.index({ email: 1 });
+
+const User = mongoose.model('User', userSchema);
+module.exports = User;

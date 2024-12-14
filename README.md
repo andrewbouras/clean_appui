@@ -137,4 +137,5 @@ git add .
 git commit -m "message"
 git push origin main
 
+git fetch origin
 git reset --hard origin/main

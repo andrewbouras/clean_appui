@@ -163,7 +163,7 @@ const formatNumber = (num: number) => Number(num.toFixed(1)).toString()
 interface ShareItem {
   id: number;
   name: string;
-  type: 'class' | 'lecture' | 'questionBank';
+  type: 'class' | 'lecture' | 'questionBank' | 'notebook' | 'chapter';
 }
 
 // Add these new components before the SmartifyStudentPortal component
@@ -483,12 +483,71 @@ export function SmartifyStudentPortal() {
   const { setTheme } = useTheme()
 
   const [downloadedQuestionBanks, setDownloadedQuestionBanks] = React.useState<number[]>([]);
-  // New state for delete confirmation
-  const [deleteConfirmation, setDeleteConfirmation] = React.useState<{
-    type: 'class' | 'lecture' | 'questionBank';
+
+  // Add notebook state
+  const [notebooks, setNotebooks] = React.useState([
+    {
+      id: 1,
+      title: 'Medical Notes',
+      description: 'General medical study notes',
+      chapters: [
+        { id: 1, title: 'Anatomy Basics' },
+        { id: 2, title: 'Physiology Overview' }
+      ]
+    },
+    {
+      id: 2,
+      title: 'Clinical Cases',
+      description: 'Patient case studies and notes',
+      chapters: [
+        { id: 3, title: 'Cardiovascular Cases' },
+        { id: 4, title: 'Respiratory Cases' }
+      ]
+    }
+  ]);
+
+  // Add notebook handlers
+  const handleNotebookAction = (action: string, notebookId: number) => {
+    if (action === 'share') {
+      const notebook = notebooks.find(n => n.id === notebookId);
+      if (notebook) {
+        setShareItem({
+          id: notebookId,
+          name: notebook.title,
+          type: 'notebook'
+        });
+        setIsShareModalOpen(true);
+      }
+    } else if (action === 'delete') {
+      setDeleteConfirmation({ type: 'notebook', id: notebookId });
+    }
+  };
+
+  const handleChapterAction = (action: string, notebookId: number, chapterId: number) => {
+    if (action === 'share') {
+      const notebook = notebooks.find(n => n.id === notebookId);
+      const chapter = notebook?.chapters.find(c => c.id === chapterId);
+      if (chapter) {
+        setShareItem({
+          id: chapterId,
+          name: chapter.title,
+          type: 'chapter'
+        });
+        setIsShareModalOpen(true);
+      }
+    } else if (action === 'delete') {
+      setDeleteConfirmation({ type: 'chapter', id: chapterId });
+    }
+  };
+
+  // Update deleteConfirmation type to include notebook and chapter
+  type DeleteConfirmationType = {
+    type: 'class' | 'lecture' | 'questionBank' | 'notebook' | 'chapter';
     id: number;
-  } | null>(null);
-  // New state for question bank details modal
+  };
+
+  const [deleteConfirmation, setDeleteConfirmation] = React.useState<DeleteConfirmationType | null>(null);
+
   const [selectedQuestionBank, setSelectedQuestionBank] = React.useState(null)
   const [isQuestionBankModalOpen, setIsQuestionBankModalOpen] = React.useState(false)
   // Add new account info state
@@ -700,6 +759,21 @@ export function SmartifyStudentPortal() {
           title: "Question Bank Deleted",
           description: `Question Bank ${deleteConfirmation.id} has been removed from your downloads.`,
         })
+      } else if (deleteConfirmation.type === 'notebook') {
+        setNotebooks(notebooks.filter(n => n.id !== deleteConfirmation.id));
+        toast({
+          title: "Notebook Deleted",
+          description: `Notebook ${deleteConfirmation.id} has been removed from your notebooks.`,
+        });
+      } else if (deleteConfirmation.type === 'chapter') {
+        setNotebooks(notebooks.map(n => ({
+          ...n,
+          chapters: n.chapters.filter(c => c.id !== deleteConfirmation.id)
+        })));
+        toast({
+          title: "Chapter Deleted",
+          description: `Chapter ${deleteConfirmation.id} has been removed from your notebook.`,
+        });
       }
       setDeleteConfirmation(null)
     }
@@ -1067,6 +1141,38 @@ export function SmartifyStudentPortal() {
     setEditingIndex(null);
   };
 
+  const [notebookTitle, setNotebookTitle] = React.useState('');
+  const [notebookDescription, setNotebookDescription] = React.useState('');
+  const [notebookSharing, setNotebookSharing] = React.useState('private');
+
+  const handleCreateNotebook = () => {
+    if (!notebookTitle.trim()) {
+      toast({
+        title: "Error",
+        description: "Please enter a notebook title",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const newNotebook = {
+      id: notebooks.length + 1,
+      title: notebookTitle,
+      description: notebookDescription,
+      chapters: [],
+    };
+
+    setNotebooks([...notebooks, newNotebook]);
+    setNotebookTitle('');
+    setNotebookDescription('');
+    setNotebookSharing('private');
+
+    toast({
+      title: "Success",
+      description: "Notebook created successfully",
+    });
+  };
+
   return (
     <TooltipProvider>
       <div className={cn(
@@ -1085,7 +1191,8 @@ export function SmartifyStudentPortal() {
                 <X className="h-4 w-4" />
               </Button>
             </div>
-            <ScrollArea className="h-[calc(100vh-400px)]"> {/* Changed from -280px to -400px */}
+            <ScrollArea className="h-[calc(100vh-400px)]">
+              {/* Classes section */}
               {classes.map((classItem) => (
                 <Collapsible key={classItem.id} className="mb-2">
                   <div className="flex items-center justify-between w-full p-2 hover:bg-accent rounded-md">
@@ -1125,34 +1232,59 @@ export function SmartifyStudentPortal() {
                   </CollapsibleContent>
                 </Collapsible>
               ))}
-              {downloadedQuestionBanks.length > 0 && (
-                <div className="mt-4">
-                  <h3 className="text-sm font-semibold mb-2">Downloaded Question Banks</h3>
-                  {downloadedQuestionBanks.map((bankId) => {
-                    const bank = publicQuestionBanks.find(b => b.id === bankId)
-                    if (!bank) return null
-                    return (
-                      <div key={bank.id} className="flex items-center justify-between p-2 hover:bg-accent rounded-md">
-                        <span className="flex items-center">
-                          <BookOpen className="h-4 w-4 mr-2" />
-                          {bank.name}
-                        </span>
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="sm">
-                              <MoreVertical className="h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent>
-                            <DropdownMenuItem onSelect={() => handleQuestionBankAction('share', bank.id)}>Share</DropdownMenuItem>
-                            <DropdownMenuItem onSelect={() => handleQuestionBankAction('delete', bank.id)}>Delete</DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </div>
-                    )
-                  })}
+
+              {/* Add Notebooks section */}
+              <div className="mt-6">
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="text-lg font-semibold">Notebooks</h2>
+                  <Button 
+                    variant="ghost" 
+                    size="icon"
+                    onClick={() => router.push('/notebooks/new')}
+                  >
+                    <Plus className="h-4 w-4" />
+                  </Button>
                 </div>
-              )}
+                {notebooks?.map((notebook) => (
+                  <Collapsible key={notebook.id} className="mb-2">
+                    <div className="flex items-center justify-between w-full p-2 hover:bg-accent rounded-md">
+                      <CollapsibleTrigger className="flex items-center text-left">
+                        <ChevronDown className="h-4 w-4 transition-transform duration-200 ease-in-out group-data-[state=open]:rotate-180 mr-2" />
+                        <span>{notebook.title}</span>
+                      </CollapsibleTrigger>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="sm">
+                            <MoreVertical className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent>
+                          <DropdownMenuItem onSelect={() => handleNotebookAction('share', notebook.id)}>Share</DropdownMenuItem>
+                          <DropdownMenuItem onSelect={() => handleNotebookAction('delete', notebook.id)}>Delete</DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
+                    <CollapsibleContent className="pl-6 mt-1">
+                      {notebook.chapters?.map((chapter) => (
+                        <div key={chapter.id} className="flex items-center justify-between p-2 hover:bg-accent rounded-md">
+                          <span>{chapter.title}</span>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="sm">
+                                <MoreVertical className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent>
+                              <DropdownMenuItem onSelect={() => handleChapterAction('share', notebook.id, chapter.id)}>Share</DropdownMenuItem>
+                              <DropdownMenuItem onSelect={() => handleChapterAction('delete', notebook.id, chapter.id)}>Delete</DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </div>
+                      ))}
+                    </CollapsibleContent>
+                  </Collapsible>
+                ))}
+              </div>
             </ScrollArea>
             <Button className="w-full mt-4" variant="outline" onClick={handleQuestionBankClick}>
               Question Bank
@@ -1444,57 +1576,131 @@ export function SmartifyStudentPortal() {
               ) : (
                 <div className="space-y-8">
                   <section>
-                    <h2 className="text-2xl font-semibold mb-4">Upload Lecture PDF</h2>
-                    <Card>
-                      <CardContent className="p-6">
-                        <div
-                          className="border-2 border-dashed border-gray-300 rounded-lg p-12 text-center cursor-pointer 
-                                   hover:bg-accent hover:border-primary transition-all duration-300"
-                          onDragOver={handleDragOver}
-                          onDrop={handleDrop}
-                          onClick={() => document.getElementById('file-upload')?.click()}
+                    <Tabs defaultValue="upload" className="space-y-6">
+                      <TabsList className="inline-flex h-auto p-1 bg-muted/50 rounded-xl">
+                        <TabsTrigger 
+                          value="upload" 
+                          className="inline-flex items-center justify-center px-6 py-3 rounded-lg text-sm font-medium transition-all data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm"
                         >
-                          <input
-                            id="file-upload"
-                            type="file"
-                            className="hidden"
-                            accept=".pdf"
-                            onChange={handlePDFUpload}
-                          />
-                          {isProcessing ? (
-                            <div className="py-8 flex flex-col items-center justify-center">
-                              <div className="relative">
-                                <div className="w-12 h-12 rounded-full border-2 border-primary/20"></div>
-                                <div className="absolute top-0 left-0 w-12 h-12 rounded-full border-2 border-primary 
-                                            border-t-transparent animate-spin"></div>
-                              </div>
-                              <div className="mt-6 space-y-2">
-                                <p className="text-base font-medium text-foreground/80">Processing your PDF</p>
-                                <p className="text-sm text-muted-foreground">This will just take a moment</p>
-                              </div>
+                          <Upload className="mr-2 h-4 w-4" />
+                          Upload Lecture PDF
+                        </TabsTrigger>
+                        <TabsTrigger 
+                          value="notebook" 
+                          className="inline-flex items-center justify-center px-6 py-3 rounded-lg text-sm font-medium transition-all data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm"
+                        >
+                          <FileText className="mr-2 h-4 w-4" />
+                          Create Notebook
+                        </TabsTrigger>
+                      </TabsList>
+
+                      <TabsContent value="upload">
+                        <h2 className="text-2xl font-semibold mb-4">Upload Lecture PDF</h2>
+                        <Card>
+                          <CardContent className="p-6">
+                            {/* Existing upload content */}
+                            <div
+                              className="border-2 border-dashed border-gray-300 rounded-lg p-12 text-center cursor-pointer 
+                                       hover:bg-accent hover:border-primary transition-all duration-300"
+                              onDragOver={handleDragOver}
+                              onDrop={handleDrop}
+                              onClick={() => document.getElementById('file-upload')?.click()}
+                            >
+                              {isProcessing ? (
+                                <div className="py-8 flex flex-col items-center justify-center">
+                                  <div className="relative">
+                                    <div className="w-12 h-12 rounded-full border-2 border-primary/20"></div>
+                                    <div className="absolute top-0 left-0 w-12 h-12 rounded-full border-2 border-primary 
+                                                border-t-transparent animate-spin"></div>
+                                  </div>
+                                  <div className="mt-6 space-y-2">
+                                    <p className="text-base font-medium text-foreground/80">Processing your PDF</p>
+                                    <p className="text-sm text-muted-foreground">This will just take a moment</p>
+                                  </div>
+                                </div>
+                              ) : (
+                                <div className="py-4">
+                                  <div className="w-12 h-12 mx-auto rounded-full bg-primary/5 flex items-center 
+                                              justify-center mb-4 group-hover:bg-primary/10 transition-colors">
+                                    <Upload className="h-6 w-6 text-primary/60" />
+                                  </div>
+                                  <p className="text-base font-medium text-foreground/80">
+                                    Click to upload or drag and drop
+                                  </p>
+                                  <p className="mt-1 text-sm text-muted-foreground">
+                                    PDF files only, up to 10MB
+                                  </p>
+                                </div>
+                              )}
                             </div>
-                          ) : (
-                            <div className="py-4">
-                              <div className="w-12 h-12 mx-auto rounded-full bg-primary/5 flex items-center 
-                                          justify-center mb-4 group-hover:bg-primary/10 transition-colors">
-                                <Upload className="h-6 w-6 text-primary/60" />
+                            {mcqError && (
+                              <div className="mt-4 p-4 bg-destructive/10 text-destructive rounded-lg text-sm">
+                                {mcqError}
                               </div>
-                              <p className="text-base font-medium text-foreground/80">
-                                Click to upload or drag and drop
-                              </p>
-                              <p className="mt-1 text-sm text-muted-foreground">
-                                PDF files only, up to 10MB
-                              </p>
-                            </div>
-                          )}
-                        </div>
-                        {mcqError && (
-                          <div className="mt-4 p-4 bg-destructive/10 text-destructive rounded-lg text-sm">
-                            {mcqError}
-                          </div>
-                        )}
-                      </CardContent>
-                    </Card>
+                            )}
+                          </CardContent>
+                        </Card>
+                      </TabsContent>
+
+                      <TabsContent value="notebook">
+                        <h2 className="text-2xl font-semibold mb-4">Create New Notebook</h2>
+                        <Card>
+                          <CardContent className="p-6">
+                            <form onSubmit={(e) => {
+                              e.preventDefault();
+                              handleCreateNotebook();
+                            }}>
+                              <div className="space-y-4">
+                                <div>
+                                  <Label htmlFor="notebook-title">Notebook Title</Label>
+                                  <Input
+                                    id="notebook-title"
+                                    value={notebookTitle}
+                                    onChange={(e) => setNotebookTitle(e.target.value)}
+                                    placeholder="Enter notebook title"
+                                    className="mt-1"
+                                  />
+                                </div>
+                                <div>
+                                  <Label htmlFor="notebook-description">Description</Label>
+                                  <Textarea
+                                    id="notebook-description"
+                                    value={notebookDescription}
+                                    onChange={(e) => setNotebookDescription(e.target.value)}
+                                    placeholder="Enter notebook description"
+                                    className="mt-1"
+                                  />
+                                </div>
+                                <div>
+                                  <Label>Sharing Options</Label>
+                                  <RadioGroup
+                                    value={notebookSharing}
+                                    onValueChange={setNotebookSharing}
+                                    className="mt-2"
+                                  >
+                                    <div className="flex items-center space-x-2">
+                                      <RadioGroupItem value="private" id="private" />
+                                      <Label htmlFor="private">Private</Label>
+                                    </div>
+                                    <div className="flex items-center space-x-2">
+                                      <RadioGroupItem value="shared" id="shared" />
+                                      <Label htmlFor="shared">Shared</Label>
+                                    </div>
+                                    <div className="flex items-center space-x-2">
+                                      <RadioGroupItem value="public" id="public" />
+                                      <Label htmlFor="public">Public</Label>
+                                    </div>
+                                  </RadioGroup>
+                                </div>
+                                <Button type="submit" className="w-full">
+                                  Create Notebook
+                                </Button>
+                              </div>
+                            </form>
+                          </CardContent>
+                        </Card>
+                      </TabsContent>
+                    </Tabs>
                   </section>
                   <section>
                     <Tabs defaultValue="questionBanks" className="space-y-6">
