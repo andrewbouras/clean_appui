@@ -1,0 +1,337 @@
+# Documentation: Displaying Notebooks and Chapters Based on User Authentication
+
+This documentation explains how notebooks and chapters are displayed on the sidebar and loaded based on user authentication in the existing codebase. It provides an overview of the key files and how they interact to achieve this functionality.
+
+---
+
+## Overview
+
+The application is a Next.js project using React and TypeScript. It utilizes:
+
+- **NextAuth.js** for authentication.
+- **Axios** for API requests.
+- **Context API** for managing authentication state (`AuthContext`).
+- **Dynamic Routing** for notebooks and chapters pages.
+
+The main components involved are:
+
+- **Authentication Flow**: Ensuring only authenticated users can access notebooks and chapters.
+- **Sidebar Component**: Displays notebooks and chapters belonging to the authenticated user.
+- **Notebook and Chapter Pages**: Fetch and display content based on the user's access.
+
+---
+
+## Authentication Flow
+
+### Files Involved
+
+- `/src/app/signIn/page.tsx`
+- `/src/contexts/AuthContext.tsx`
+- `/src/components/component/signin.tsx`
+
+### Description
+
+- **SignIn Page (`/src/app/signIn/page.tsx`)**
+
+  - Handles user sign-in using NextAuth.js.
+  - Uses the `signIn` function from `next-auth/react` to initiate Google OAuth.
+  - After successful authentication, redirects the user back to the application.
+
+- **Auth Context (`/src/contexts/AuthContext.tsx`)**
+
+  - Provides authentication state (`user`, `isAuthenticated`) throughout the application.
+  - Uses React Context API to make auth state accessible via the `useAuth` hook.
+
+- **SignIn Component (`/src/components/component/signin.tsx`)**
+
+  - Renders a sign-in prompt when the user is not authenticated.
+  - Encourages users to sign in to access the application's features.
+
+---
+
+## Sidebar Component
+
+### Files Involved
+
+- `/src/components/component/Sidebar.tsx` (Assuming this file exists based on context)
+- `/src/types/sidebar.ts`
+
+### Description
+
+- **Sidebar Component**
+
+  - Displays a list of notebooks and chapters for the authenticated user.
+  - Provides navigation between different notebooks and their chapters.
+  - Includes functionality to create new notebooks and manage existing ones.
+
+- **Sidebar Types (`/src/types/sidebar.ts`)**
+
+  - Defines TypeScript types for `Notebook`, `Chapter`, `QuestionBank`, `UserRole`, and `SidebarProps`.
+  - Ensures type safety and consistency across components that use these data structures.
+
+---
+
+## Fetching Notebooks and Chapters
+
+### Files Involved
+
+- `/src/components/component/Sidebar.tsx`
+- `/src/contexts/AuthContext.tsx`
+- `/src/app/notebook/[id]/page.tsx`
+- `/src/app/notebook/[id]/chapters/[chapterId]/page.tsx`
+
+### Description
+
+- **Data Fetching in Sidebar**
+
+  - Upon mounting, the `Sidebar` component fetches the list of notebooks and chapters associated with the authenticated user.
+  - Uses Axios to make API requests to the backend, including the user's `accessToken` in the headers for authentication.
+
+- **Auth Context Usage**
+
+  - The `useAuth` hook provides access to the `user` object, which contains the `accessToken`.
+  - This token is included in API requests to authorize the user.
+
+#### Example (Simplified Fetch Call)
+
+```typescript
+// Inside Sidebar component
+const { user } = useAuth();
+
+useEffect(() => {
+  const fetchNotebooks = async () => {
+    try {
+      const response = await axios.get(`${apiUrl}/notebooks`, {
+        headers: {
+          Authorization: `Bearer ${user.accessToken}`,
+        },
+      });
+      setNotebooks(response.data);
+    } catch (error) {
+      console.error('Failed to fetch notebooks:', error);
+    }
+  };
+
+  if (user) {
+    fetchNotebooks();
+  }
+}, [user]);
+```
+
+---
+
+## Displaying Notebooks and Chapters
+
+### Files Involved
+
+- `/src/app/notebook/[id]/page.tsx`
+- `/src/app/notebook/[id]/chapters/[chapterId]/page.tsx`
+- `/src/components/component/NewChapter.tsx`
+
+### Description
+
+- **Notebook Page (`/src/app/notebook/[id]/page.tsx`)**
+
+  - Displays the selected notebook and its chapters.
+  - Fetches notebook data using the notebook ID from the URL.
+  - Renders a list of chapters and allows navigation to individual chapters.
+
+- **Chapter Page (`/src/app/notebook/[id]/chapters/[chapterId]/page.tsx`)**
+
+  - Displays the content of a selected chapter.
+  - Fetches chapter data using the chapter ID from the URL.
+  - Ensures that only authenticated users with access rights can view the content.
+
+- **New Chapter Component (`/src/components/component/NewChapter.tsx`)**
+
+  - Provides functionality to create a new chapter within a notebook.
+  - Includes form handling and API calls to save the new chapter to the backend.
+
+---
+
+## Authentication Checks in Pages
+
+### Files Involved
+
+- `/src/app/notebook/[id]/page.tsx`
+- `/src/app/notebook/[id]/chapters/[chapterId]/page.tsx`
+- `/src/app/bank/[id]/page.tsx`
+
+### Description
+
+- **Session Handling**
+
+  - Uses the `useSession` hook from `next-auth/react` to check authentication status.
+  - If the user is not authenticated (`!session`), prompts the user to sign in.
+
+- **Loading States**
+
+  - Displays a loading indicator while authentication status is being determined.
+  - Ensures a smooth user experience during data fetches.
+
+#### Example (Authentication Check)
+
+```typescript
+const { data: session, status } = useSession();
+
+if (status === 'loading') {
+  return <LoadingIndicator />;
+}
+
+if (!session) {
+  return (
+    <div>
+      <h1>Access Denied</h1>
+      <button onClick={() => signIn('google')}>Sign in with Google</button>
+    </div>
+  );
+}
+```
+
+---
+
+## API Interaction
+
+### Files Involved
+
+- `/src/utils/api.ts` (Assumed utility file for API calls)
+- Backend routes that correspond to notebooks and chapters (not detailed here)
+
+### Description
+
+- **Authenticated API Requests**
+
+  - All API requests include the `Authorization` header with the user's `accessToken`.
+  - The backend verifies this token to ensure the user is authenticated and authorized to access the requested data.
+
+- **Fetching Data**
+
+  - Components make API calls to fetch notebooks, chapters, and other related data.
+  - Error handling is implemented to catch and display errors if requests fail.
+
+#### Example (API Call with Token)
+
+```typescript
+const fetchNotebook = async (notebookId: string) => {
+  try {
+    const response = await axios.get(`${apiUrl}/notebooks/${notebookId}`, {
+      headers: {
+        Authorization: `Bearer ${user.accessToken}`,
+      },
+    });
+    setNotebook(response.data);
+  } catch (error) {
+    console.error('Failed to load notebook:', error);
+  }
+};
+```
+
+---
+
+## User Access and Security
+
+### Files Involved
+
+- `/src/app/bank/[id]/page.tsx`
+- `/src/app/bank/[id]/enroll/page.tsx`
+
+### Description
+
+- **Access Control**
+
+  - Some content may require additional access rights or enrollment.
+  - The application checks if the user has access to certain question banks or chapters.
+  - If the user lacks access, they are redirected to an enrollment page.
+
+- **Enrollment Page**
+
+  - Provides information about the content and any associated costs.
+  - Allows users to enroll or purchase access to premium content.
+
+---
+
+## User Interface and Interaction
+
+### Files Involved
+
+- `/src/components/component/DisplayNotes.tsx`
+- `/src/components/component/QuestionComponent.tsx`
+- `/src/components/ui/button.tsx`
+
+### Description
+
+- **DisplayNotes Component**
+
+  - Renders the content of a note or chapter.
+  - Allows editing and saving changes.
+
+- **QuestionComponent**
+
+  - Handles the display and interaction with questions and responses.
+  - Fetches questions related to a chapter or question bank.
+
+- **UI Components**
+
+  - Reusable UI components such as buttons, cards, and loading indicators ensure a consistent look and feel.
+  - Enhances user experience with responsive design and interactive elements.
+
+---
+
+## Summary of Key Processes
+
+1. **User Authentication**
+
+   - Handled via NextAuth.js and Google OAuth.
+   - Authentication state is accessible throughout the app via `useSession` and `useAuth`.
+
+2. **Data Fetching with Authentication**
+
+   - API requests include the user's `accessToken` for secure data retrieval.
+   - The backend validates tokens and returns user-specific data.
+
+3. **Displaying Notebooks and Chapters**
+
+   - The `Sidebar` component lists notebooks and chapters.
+   - Users can navigate to specific notebooks and chapters to view and edit content.
+
+4. **Access Control**
+
+   - Users receive appropriate access based on their authentication status and enrollment.
+   - Unauthorized users are prompted to sign in or enroll as necessary.
+
+---
+
+## Conclusion
+
+The integration of user authentication with the display of notebooks and chapters ensures that users can securely access and manage their own content. By leveraging NextAuth.js for authentication and carefully structuring API requests, the application provides a seamless experience where the sidebar and other components dynamically reflect the authenticated user's data.
+
+This architecture allows for scalability and flexibility, enabling features like premium content access and collaborative functionalities to be implemented with robust access control mechanisms.
+
+---
+Here are the relevant file names from your codebase that you can share with your colleague for this effort:
+
+/src/app/signIn/page.tsx
+/src/contexts/AuthContext.tsx
+/src/components/component/signin.tsx
+/src/components/component/Sidebar.tsx
+/src/types/sidebar.ts
+/src/app/notebook/[id]/page.tsx
+/src/app/notebook/[id]/chapters/[chapterId]/page.tsx
+/src/components/component/NewChapter.tsx
+/src/app/bank/[id]/page.tsx
+/src/app/bank/[id]/enroll/page.tsx
+/src/utils/api.ts
+/src/components/component/DisplayNotes.tsx
+/src/components/component/QuestionComponent.tsx
+/src/components/ui/button.tsx
+/auth_notebooks_chapters.txt
+These files are involved in:
+
+Authentication Flow
+Sidebar Component
+Fetching Notebooks and Chapters
+Displaying Notebooks and Chapters
+Authentication Checks in Pages
+API Interaction
+User Access and Security
+User Interface and Interaction
