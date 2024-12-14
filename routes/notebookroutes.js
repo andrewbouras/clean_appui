@@ -188,4 +188,48 @@ router.post('/:id/share', auth, async (req, res) => {
   }
 });
 
+// Update chapter progress
+router.post('/:id/chapters/:chapterId/progress', auth, async (req, res) => {
+  try {
+    const notebook = await Notebook.findOne({
+      _id: req.params.id,
+      $or: [
+        { owner: req.user._id },
+        { sharedWith: req.user._id },
+        { isPublic: true }
+      ]
+    });
+
+    if (!notebook) {
+      return res.status(404).json({ error: 'Notebook not found' });
+    }
+
+    const chapter = notebook.chapters.id(req.params.chapterId);
+    if (!chapter) {
+      return res.status(404).json({ error: 'Chapter not found' });
+    }
+
+    // Find existing progress or create new one
+    let progress = chapter.progress.find(p => p.userId.toString() === req.user._id.toString());
+    
+    if (!progress) {
+      chapter.progress.push({
+        userId: req.user._id,
+        timeSpent: req.body.timeSpent || 0,
+        completed: req.body.completed || false,
+        lastAccessed: new Date()
+      });
+    } else {
+      progress.timeSpent = req.body.timeSpent || progress.timeSpent;
+      progress.completed = req.body.completed || progress.completed;
+      progress.lastAccessed = new Date();
+    }
+
+    await notebook.save();
+    res.json({ message: 'Progress updated successfully' });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 module.exports = router;

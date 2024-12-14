@@ -1,5 +1,25 @@
 const mongoose = require('mongoose');
 
+const chapterProgressSchema = new mongoose.Schema({
+  userId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    required: true
+  },
+  completed: {
+    type: Boolean,
+    default: false
+  },
+  lastAccessed: {
+    type: Date,
+    default: Date.now
+  },
+  timeSpent: {
+    type: Number,
+    default: 0
+  }
+});
+
 const notebookSchema = new mongoose.Schema({
   title: {
     type: String,
@@ -37,6 +57,16 @@ const notebookSchema = new mongoose.Schema({
       type: Number,
       required: true
     },
+    progress: [chapterProgressSchema],
+    attachments: [{
+      fileName: String,
+      fileUrl: String,
+      fileType: String,
+      uploadedAt: {
+        type: Date,
+        default: Date.now
+      }
+    }],
     createdAt: {
       type: Date,
       default: Date.now

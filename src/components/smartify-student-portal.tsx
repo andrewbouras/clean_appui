@@ -28,6 +28,7 @@ import { motion } from 'framer-motion'
 import { useEffect, useState, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { QuestionConfigDialog } from "@/components/question-config-dialog"
+import NewChapter from "@/components/component/NewChapter"
 
 // Mock data for questions
 const questions = [
@@ -1173,6 +1174,30 @@ export function SmartifyStudentPortal() {
     });
   };
 
+  // Add new state for notebook/chapter view
+  const [isNotebookView, setIsNotebookView] = React.useState(false);
+  const [currentNotebook, setCurrentNotebook] = React.useState<any>(null);
+  const [currentChapter, setCurrentChapter] = React.useState<any>(null);
+
+  // Add notebook view handler
+  const handleNotebookClick = (notebook: any) => {
+    setCurrentNotebook(notebook);
+    setCurrentChapter(null);
+    setIsNotebookView(true);
+    setIsQuestionBankView(false);
+  };
+
+  // Add chapter view handler
+  const handleChapterClick = (notebook: any, chapter: any) => {
+    setCurrentNotebook(notebook);
+    setCurrentChapter(chapter);
+    setIsNotebookView(true);
+    setIsQuestionBankView(false);
+  };
+
+  // Add isCreatingChapter state
+  const [isCreatingChapter, setIsCreatingChapter] = React.useState(false);
+
   return (
     <TooltipProvider>
       <div className={cn(
@@ -1250,7 +1275,12 @@ export function SmartifyStudentPortal() {
                     <div className="flex items-center justify-between w-full p-2 hover:bg-accent rounded-md">
                       <CollapsibleTrigger className="flex items-center text-left">
                         <ChevronDown className="h-4 w-4 transition-transform duration-200 ease-in-out group-data-[state=open]:rotate-180 mr-2" />
-                        <span>{notebook.title}</span>
+                        <span 
+                          className="cursor-pointer hover:text-primary"
+                          onClick={() => handleNotebookClick(notebook)}
+                        >
+                          {notebook.title}
+                        </span>
                       </CollapsibleTrigger>
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
@@ -1266,7 +1296,11 @@ export function SmartifyStudentPortal() {
                     </div>
                     <CollapsibleContent className="pl-6 mt-1">
                       {notebook.chapters?.map((chapter) => (
-                        <div key={chapter.id} className="flex items-center justify-between p-2 hover:bg-accent rounded-md">
+                        <div 
+                          key={chapter.id} 
+                          className="flex items-center justify-between p-2 hover:bg-accent rounded-md cursor-pointer"
+                          onClick={() => handleChapterClick(notebook, chapter)}
+                        >
                           <span>{chapter.title}</span>
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>
@@ -1571,6 +1605,85 @@ export function SmartifyStudentPortal() {
                         <p>No questions available for the current filter.</p>
                       </Card>
                     )}
+                  </section>
+                </div>
+              ) : isNotebookView ? (
+                <div className="space-y-8">
+                  <section>
+                    <Card className="w-full">
+                      <CardHeader>
+                        <div className="flex justify-between items-center">
+                          <CardTitle className="text-2xl font-bold">
+                            {currentNotebook?.title}
+                            {currentChapter && (
+                              <span className="text-muted-foreground ml-2">
+                                / {currentChapter.title}
+                              </span>
+                            )}
+                          </CardTitle>
+                          <Button
+                            variant="outline"
+                            onClick={() => {
+                              setCurrentChapter(null);
+                              setIsNotebookView(false);
+                            }}
+                          >
+                            Back
+                          </Button>
+                        </div>
+                      </CardHeader>
+                      <CardContent>
+                        {currentChapter ? (
+                          <div className="prose max-w-none">
+                            <p className="whitespace-pre-wrap">{currentChapter.content}</p>
+                          </div>
+                        ) : (
+                          <div className="space-y-4">
+                            <div className="flex justify-between items-center">
+                              <h2 className="text-xl font-semibold">Chapters</h2>
+                              <Button 
+                                onClick={() => setIsCreatingChapter(true)}
+                                className="bg-primary hover:bg-primary/90"
+                              >
+                                Add New Chapter
+                              </Button>
+                            </div>
+                            {currentNotebook?.chapters?.length === 0 ? (
+                              <div className="text-center py-8 text-muted-foreground">
+                                <p>No chapters yet. Click "Add New Chapter" to create your first chapter.</p>
+                              </div>
+                            ) : (
+                              <div className="grid gap-4">
+                                {currentNotebook?.chapters?.map((chapter: any) => (
+                                  <div
+                                    key={chapter.id}
+                                    className="bg-muted/50 rounded-lg p-4 hover:bg-muted/70 transition-colors cursor-pointer"
+                                    onClick={() => handleChapterClick(currentNotebook, chapter)}
+                                  >
+                                    <div className="flex justify-between items-center">
+                                      <div>
+                                        <h3 className="text-lg font-medium">{chapter.title}</h3>
+                                        {chapter.content && (
+                                          <p className="text-muted-foreground text-sm mt-1">
+                                            {chapter.content.substring(0, 100)}...
+                                          </p>
+                                        )}
+                                      </div>
+                                      <Button
+                                        variant="ghost"
+                                        className="text-primary hover:text-primary/90"
+                                      >
+                                        View Chapter →
+                                      </Button>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </CardContent>
+                    </Card>
                   </section>
                 </div>
               ) : (
@@ -2333,6 +2446,21 @@ export function SmartifyStudentPortal() {
           <QuestionConfigDialog />
         </DialogContent>
       </Dialog>
+
+      {isCreatingChapter && currentNotebook && (
+        <NewChapter
+          notebookId={currentNotebook.id.toString()}
+          onSuccess={() => {
+            setIsCreatingChapter(false);
+            // Refresh notebook data
+            const updatedNotebook = notebooks.find(n => n.id === currentNotebook.id);
+            if (updatedNotebook) {
+              setCurrentNotebook(updatedNotebook);
+            }
+          }}
+          onCancel={() => setIsCreatingChapter(false)}
+        />
+      )}
     </TooltipProvider>
   )
 }

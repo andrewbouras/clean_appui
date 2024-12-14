@@ -51,7 +51,7 @@ export default function NotebookPage() {
     try {
       const apiUrl = process.env.NODE_ENV === 'production'
         ? process.env.NEXT_PUBLIC_API_URL_PRODUCTION
-        : process.env.NEXT_PUBLIC_API_URL_DEV ;
+        : process.env.NEXT_PUBLIC_API_URL_DEV;
 
       const response = await axios.get(`${apiUrl}/notebooks/${notebookId}`, {
         headers: {
@@ -59,7 +59,6 @@ export default function NotebookPage() {
         },
       });
       setNotebook(response.data);
-      console.log("Response data", response.data);
     } catch (error: unknown) {
       if (axios.isAxiosError(error)) {
         console.error('Failed to load notebook:', error.message);
@@ -96,36 +95,71 @@ export default function NotebookPage() {
   return (
     <div className="flex min-h-screen">
       <Sidebar isSidebarOpen={isSidebarOpen} toggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)} />
-      <div className={`flex-grow transition-all duration-300 ${isSidebarOpen ? 'ml-80' : 'ml-0'} flex flex-col items-center`}>
+      <div className={`flex-grow transition-all duration-300 ${isSidebarOpen ? 'ml-80' : 'ml-0'} flex flex-col items-center p-6`}>
         {notebook ? (
           <>
-            <h1 className="text-3xl font-bold mt-6 mb-4">{notebook.title}</h1>
-            <ShareButton type="notebook" id={notebookId!} />
-            <div className="flex w-full">
-              <div className={`transition-all duration-300 ${isSidebarOpen ? 'w-1/4' : 'w-1/4'} p-4 bg-gray-100 shadow-lg rounded-lg`}>
-                <h2 className="text-2xl font-semibold mb-4">Question Banks</h2>
-                <ul>
-                  {notebook.chapters.map((chapter) => (
-                    <li key={chapter._id} className="p-2 cursor-pointer hover:bg-gray-200 rounded-md" onClick={() => handleChapterClick(chapter)}>
-                      {chapter.title}
-                    </li>
-                  ))}
-                </ul>
-                <Button onClick={() => setIsCreatingChapter(true)} className="mt-4 w-full">Create New Questions</Button>
+            <div className="w-full max-w-4xl">
+              <div className="flex justify-between items-center mb-6">
+                <h1 className="text-3xl font-bold">{notebook.title}</h1>
+                <ShareButton type="notebook" id={notebookId!} />
               </div>
-              <div className={`transition-all duration-300 ${isSidebarOpen ? 'w-3/4' : 'w-full'} p-6`}>
-                {selectedChapter ? (
-                  <div>
-                    <h2 className="text-2xl font-semibold">{selectedChapter.title}</h2>
-                    <DisplayNotes initialTitle={selectedChapter.title} initialContent={selectedChapter.content} onSave={() => {}} />
+
+              <div className="bg-white rounded-lg shadow-lg p-6">
+                <div className="flex justify-between items-center mb-4">
+                  <h2 className="text-xl font-semibold">Chapters</h2>
+                  <Button 
+                    onClick={() => setIsCreatingChapter(true)}
+                    className="bg-green-500 hover:bg-green-600 text-white"
+                  >
+                    Add New Chapter
+                  </Button>
+                </div>
+
+                {notebook.chapters.length === 0 ? (
+                  <div className="text-center py-8 text-gray-500">
+                    <p>No chapters yet. Click "Add New Chapter" to create your first chapter.</p>
                   </div>
-                ) : isCreatingChapter ? (
-                  <NewChapter notebookId={notebookId!} />
                 ) : (
-                  <div>Select a Question Bank to view its content.</div>
+                  <div className="grid gap-4">
+                    {notebook.chapters.map((chapter) => (
+                      <div
+                        key={chapter._id}
+                        className="bg-gray-50 rounded-lg p-4 hover:bg-gray-100 transition-colors cursor-pointer"
+                        onClick={() => handleChapterClick(chapter)}
+                      >
+                        <div className="flex justify-between items-center">
+                          <div>
+                            <h3 className="text-lg font-medium">{chapter.title}</h3>
+                            {chapter.content && (
+                              <p className="text-gray-600 text-sm mt-1">
+                                {chapter.content.substring(0, 100)}...
+                              </p>
+                            )}
+                          </div>
+                          <Button
+                            variant="ghost"
+                            className="text-blue-500 hover:text-blue-600"
+                          >
+                            View Chapter →
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 )}
               </div>
             </div>
+
+            {isCreatingChapter && (
+              <NewChapter
+                notebookId={notebookId!}
+                onSuccess={() => {
+                  setIsCreatingChapter(false);
+                  fetchNotebook(notebookId!);
+                }}
+                onCancel={() => setIsCreatingChapter(false)}
+              />
+            )}
           </>
         ) : (
           <div>Loading notebook...</div>
