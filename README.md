@@ -1,39 +1,137 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Next.js + Express Authentication App
 
-## Getting Started
+A full-stack application using Next.js for the frontend and Express for the backend, featuring Google OAuth authentication.
 
-First, run the development server:
+## Prerequisites
 
+- Node.js (v18 or higher)
+- MongoDB database
+- Google OAuth credentials
+
+## Setup
+
+1. Clone the repository:
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+git clone <your-repo-url>
+cd <your-repo-name>
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+2. Install dependencies:
+```bash
+npm install
+```
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+3. Create environment files:
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Create `.env` in the root directory:
+```env
+MONGODB_URI=your_mongodb_connection_string
+GOOGLE_CLIENT_ID=your_google_client_id
+GOOGLE_CLIENT_SECRET=your_google_client_secret
+GOOGLE_CALLBACK_URL=http://localhost:3001/auth/google/callback
+BASE_URL=http://localhost:3001
+FRONTEND_URL=http://localhost:3000
 
-## Learn More
+# Auth secrets
+COOKIE_KEY=your_cookie_key
+SESSION_SECRET=your_session_secret
+JWT_SECRET=your_jwt_secret
 
-To learn more about Next.js, take a look at the following resources:
+# Other configurations
+PORT=3001
+CORS_ORIGIN=http://localhost:3000
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+Create `.env.local` in the root directory:
+```env
+NEXT_PUBLIC_API_URL=http://localhost:3001
+```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+4. Set up Google OAuth:
+   - Go to [Google Cloud Console](https://console.cloud.google.com)
+   - Create a new project or select an existing one
+   - Enable the Google+ API
+   - Go to Credentials > Create Credentials > OAuth Client ID
+   - Set up the OAuth consent screen
+   - Add authorized redirect URI: `http://localhost:3001/auth/google/callback`
+   - Copy the Client ID and Client Secret to your `.env` file
 
-## Deploy on Vercel
+## Running the Application
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+### Development Mode
+To run both frontend and backend servers concurrently:
+```bash
+npm run dev:all
+```
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+This will start:
+- Frontend server on http://localhost:3000
+- Backend server on http://localhost:3001
+
+### Individual Commands
+To run servers separately:
+
+Frontend only:
+```bash
+npm run dev
+```
+
+Backend only:
+```bash
+npm run server
+```
+
+## Project Structure
+
+```
+├── src/
+│   ├── components/     # React components
+│   ├── lib/           # Utility functions
+│   └── app/           # Next.js pages
+├── routes/            # Express routes
+├── config/           # Backend configuration
+├── models/           # MongoDB models
+└── server.js         # Express server
+```
+
+## Features
+
+- Google OAuth Authentication
+- JWT-based session management
+- MongoDB user storage
+- Secure HTTP-only cookies
+- Protected routes
+- Responsive UI
+
+## Environment Variables
+
+### Backend (.env)
+- `MONGODB_URI`: MongoDB connection string
+- `GOOGLE_CLIENT_ID`: Google OAuth client ID
+- `GOOGLE_CLIENT_SECRET`: Google OAuth client secret
+- `GOOGLE_CALLBACK_URL`: OAuth callback URL
+- `BASE_URL`: Backend server URL
+- `FRONTEND_URL`: Frontend server URL
+- `COOKIE_KEY`: Cookie encryption key
+- `SESSION_SECRET`: Session secret
+- `JWT_SECRET`: JWT signing secret
+- `PORT`: Backend server port
+- `CORS_ORIGIN`: Allowed CORS origin
+
+### Frontend (.env.local)
+- `NEXT_PUBLIC_API_URL`: Backend API URL
+
+## Contributing
+
+1. Fork the repository
+2. Create your feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add some amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
+
+## License
+
+This project is licensed under the MIT License - see the LICENSE file for details
 
 git add .
 git commit -m "message"
